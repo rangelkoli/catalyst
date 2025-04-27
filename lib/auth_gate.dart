@@ -9,7 +9,8 @@ class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
   Future<bool> _isOnboarded(String uid) async {
-    final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    final doc =
+        await FirebaseFirestore.instance.collection('users').doc(uid).get();
     return doc.exists && (doc.data()?['onboarded'] == true);
   }
 

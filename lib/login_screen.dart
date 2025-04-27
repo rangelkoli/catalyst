@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'signup_screen.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'services/firestore_service.dart';
+import 'models/app_user.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -91,7 +94,28 @@ class _LoginScreenState extends State<LoginScreen> {
                     accessToken: googleAuth.accessToken,
                     idToken: googleAuth.idToken,
                   );
-                  await FirebaseAuth.instance.signInWithCredential(credential);
+                  final userCred = await FirebaseAuth.instance
+                      .signInWithCredential(credential);
+                  final user = userCred.user;
+                  if (user != null) {
+                    final firestore = FirestoreService();
+                    final doc =
+                        await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(user.uid)
+                            .get();
+                    if (!doc.exists) {
+                      await firestore.setUser(
+                        AppUser(
+                          uid: user.uid,
+                          email: user.email ?? '',
+                          points: 0,
+                          records: const {},
+                          onboarded: false,
+                        ),
+                      );
+                    }
+                  }
                 } on FirebaseAuthException catch (e) {
                   setState(() {
                     _error = e.message;

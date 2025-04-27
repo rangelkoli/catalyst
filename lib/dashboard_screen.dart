@@ -68,9 +68,10 @@ class DashboardScreen extends StatelessWidget {
                   itemBuilder: (context, i) {
                     final habit = habits[i];
                     return ListTile(
-                      title: Text(habit.name),
-                      subtitle: Text('Streak: ${habit.streak}'),
-                      trailing: Text('Points: ${habit.points}'),
+                      title: Text(habit.desc),
+                      subtitle: Text(
+                        'When/Where: ${habit.whenWhere}\nDifficulty: ${habit.difficulty}',
+                      ),
                     );
                   },
                 );

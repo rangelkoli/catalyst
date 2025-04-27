@@ -24,7 +24,12 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
 
   // Choice options
   final List<String> areaOptions = [
-    'Health', 'Productivity', 'Learning', 'Mindfulness', 'Finances', 'Other...'
+    'Health',
+    'Productivity',
+    'Learning',
+    'Mindfulness',
+    'Finances',
+    'Other...',
   ];
   String? selectedArea;
   String customArea = '';
@@ -34,7 +39,7 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
     'Finish my online course',
     'Feel calmer daily',
     'Save more money',
-    'Other...'
+    'Other...',
   ];
   String? selectedGoal;
   String customGoal = '';
@@ -45,7 +50,7 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
     'Stretch for 2 minutes',
     'Plan tomorrow\'s top task',
     'Read one article',
-    'Other...'
+    'Other...',
   ];
   String? selectedHabit;
   String customHabit = '';
@@ -54,7 +59,7 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
     'When my first alarm rings',
     'After lunch',
     'Before bed',
-    'Other...'
+    'Other...',
   ];
   String? selectedWhenWhere;
   String customWhenWhere = '';
@@ -64,7 +69,7 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
     'Enjoy a coffee break',
     '15 mins social media',
     'Listen to a podcast',
-    'Other...'
+    'Other...',
   ];
   String? selectedReward;
   String customReward = '';
@@ -94,13 +99,50 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
     final userDoc = FirebaseFirestore.instance.collection('users').doc(uid);
-    await userDoc.set({
-      'area': area,
-      'goalDesc': goalDesc,
-      'habits': habits,
-      'rewards': rewards,
-      'onboarded': true,
-    }, SetOptions(merge: true));
+    final docSnap = await userDoc.get();
+    if (!docSnap.exists) {
+      // Create the user doc with minimal info and onboarded: false
+      await userDoc.set({
+        'email': FirebaseAuth.instance.currentUser?.email ?? '',
+        'onboarded': false,
+      });
+    }
+    await userDoc.set({'onboarded': true}, SetOptions(merge: true));
+
+    // Save goal
+    final goalId = FirebaseFirestore.instance.collection('goals').doc().id;
+    await FirebaseFirestore.instance.collection('goals').doc(goalId).set({
+      'id': goalId,
+      'userId': uid,
+      'title': area,
+      'description': goalDesc,
+      'habitIds': [],
+      'progress': 0,
+    });
+
+    // Save habits
+    for (final habit in habits) {
+      final habitId = FirebaseFirestore.instance.collection('habits').doc().id;
+      await FirebaseFirestore.instance.collection('habits').doc(habitId).set({
+        'id': habitId,
+        'userId': uid,
+        'desc': habit['desc'],
+        'difficulty': habit['difficulty'],
+        'whenWhere': habit['whenWhere'],
+      });
+    }
+
+    // Save rewards
+    for (final reward in rewards) {
+      final rewardId =
+          FirebaseFirestore.instance.collection('rewards').doc().id;
+      await FirebaseFirestore.instance.collection('rewards').doc(rewardId).set({
+        'id': rewardId,
+        'userId': uid,
+        'desc': reward['desc'],
+        'cost': reward['cost'],
+      });
+    }
   }
 
   Widget buildStep() {
@@ -109,9 +151,14 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Welcome to LiFE Ledger!', style: Theme.of(context).textTheme.headlineSmall),
+            Text(
+              'Welcome to LiFE Ledger!',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
             const SizedBox(height: 16),
-            const Text("Let's set up your personal economy for building better habits. This quick wizard helps you define what matters most to you right now."),
+            const Text(
+              "Let's set up your personal economy for building better habits. This quick wizard helps you define what matters most to you right now.",
+            ),
             const Spacer(),
             Align(
               alignment: Alignment.bottomRight,
@@ -126,19 +173,22 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("What's one area of your life you'd like to focus on improving right now? (e.g., Health, Productivity, Learning, Mindfulness, Finances)"),
+            const Text(
+              "What's one area of your life you'd like to focus on improving right now? (e.g., Health, Productivity, Learning, Mindfulness, Finances)",
+            ),
             const SizedBox(height: 16),
-            ...areaOptions.map((option) => RadioListTile<String>(
-                  title: Text(option),
-                  value: option,
-                  groupValue: selectedArea,
-                  onChanged: (val) {
-                    setState(() {
-                      selectedArea = val;
-                      if (val != 'Other...') customArea = '';
-                    });
-                  },
-                )),
+            ...areaOptions.map(
+              (option) => SelectableOptionTile(
+                label: option,
+                selected: selectedArea == option,
+                onTap: () {
+                  setState(() {
+                    selectedArea = option;
+                    if (option != 'Other...') customArea = '';
+                  });
+                },
+              ),
+            ),
             if (selectedArea == 'Other...')
               TextField(
                 decoration: const InputDecoration(labelText: 'Custom Area'),
@@ -148,16 +198,23 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                if (step > 0) TextButton(onPressed: prevStep, child: const Text('Back')),
+                if (step > 0)
+                  TextButton(onPressed: prevStep, child: const Text('Back')),
                 ElevatedButton(
-                  onPressed: selectedArea != null && (selectedArea != 'Other...' || customArea.isNotEmpty)
-                      ? () {
-                          setState(() {
-                            area = selectedArea == 'Other...' ? customArea : selectedArea!;
-                          });
-                          nextStep();
-                        }
-                      : null,
+                  onPressed:
+                      selectedArea != null &&
+                              (selectedArea != 'Other...' ||
+                                  customArea.isNotEmpty)
+                          ? () {
+                            setState(() {
+                              area =
+                                  selectedArea == 'Other...'
+                                      ? customArea
+                                      : selectedArea!;
+                            });
+                            nextStep();
+                          }
+                          : null,
                   child: const Text('Next'),
                 ),
               ],
@@ -168,19 +225,22 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Can you briefly describe what 'success' in $area looks like for you in the next month or two? (Optional)"),
+            Text(
+              "Can you briefly describe what 'success' in $area looks like for you in the next month or two? (Optional)",
+            ),
             const SizedBox(height: 16),
-            ...goalOptions.map((option) => RadioListTile<String>(
-                  title: Text(option),
-                  value: option,
-                  groupValue: selectedGoal,
-                  onChanged: (val) {
-                    setState(() {
-                      selectedGoal = val;
-                      if (val != 'Other...') customGoal = '';
-                    });
-                  },
-                )),
+            ...goalOptions.map(
+              (option) => SelectableOptionTile(
+                label: option,
+                selected: selectedGoal == option,
+                onTap: () {
+                  setState(() {
+                    selectedGoal = option;
+                    if (option != 'Other...') customGoal = '';
+                  });
+                },
+              ),
+            ),
             if (selectedGoal == 'Other...')
               TextField(
                 decoration: const InputDecoration(labelText: 'Custom Goal'),
@@ -192,14 +252,20 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
               children: [
                 TextButton(onPressed: prevStep, child: const Text('Back')),
                 ElevatedButton(
-                  onPressed: selectedGoal != null && (selectedGoal != 'Other...' || customGoal.isNotEmpty)
-                      ? () {
-                          setState(() {
-                            goalDesc = selectedGoal == 'Other...' ? customGoal : selectedGoal!;
-                          });
-                          nextStep();
-                        }
-                      : null,
+                  onPressed:
+                      selectedGoal != null &&
+                              (selectedGoal != 'Other...' ||
+                                  customGoal.isNotEmpty)
+                          ? () {
+                            setState(() {
+                              goalDesc =
+                                  selectedGoal == 'Other...'
+                                      ? customGoal
+                                      : selectedGoal!;
+                            });
+                            nextStep();
+                          }
+                          : null,
                   child: const Text('Next'),
                 ),
               ],
@@ -210,19 +276,22 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Thinking about your goal of ${goalDesc.isNotEmpty ? goalDesc : area}, what's a small, simple action you could take almost every day to move towards it?"),
+            Text(
+              "Thinking about your goal of ${goalDesc.isNotEmpty ? goalDesc : area}, what's a small, simple action you could take almost every day to move towards it?",
+            ),
             const SizedBox(height: 16),
-            ...habitOptions.map((option) => RadioListTile<String>(
-                  title: Text(option),
-                  value: option,
-                  groupValue: selectedHabit,
-                  onChanged: (val) {
-                    setState(() {
-                      selectedHabit = val;
-                      if (val != 'Other...') customHabit = '';
-                    });
-                  },
-                )),
+            ...habitOptions.map(
+              (option) => SelectableOptionTile(
+                label: option,
+                selected: selectedHabit == option,
+                onTap: () {
+                  setState(() {
+                    selectedHabit = option;
+                    if (option != 'Other...') customHabit = '';
+                  });
+                },
+              ),
+            ),
             if (selectedHabit == 'Other...')
               TextField(
                 decoration: const InputDecoration(labelText: 'Custom Habit'),
@@ -234,14 +303,20 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
               children: [
                 TextButton(onPressed: prevStep, child: const Text('Back')),
                 ElevatedButton(
-                  onPressed: selectedHabit != null && (selectedHabit != 'Other...' || customHabit.isNotEmpty)
-                      ? () {
-                          setState(() {
-                            habitDesc = selectedHabit == 'Other...' ? customHabit : selectedHabit!;
-                          });
-                          nextStep();
-                        }
-                      : null,
+                  onPressed:
+                      selectedHabit != null &&
+                              (selectedHabit != 'Other...' ||
+                                  customHabit.isNotEmpty)
+                          ? () {
+                            setState(() {
+                              habitDesc =
+                                  selectedHabit == 'Other...'
+                                      ? customHabit
+                                      : selectedHabit!;
+                            });
+                            nextStep();
+                          }
+                          : null,
                   child: const Text('Next'),
                 ),
               ],
@@ -252,7 +327,9 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("On a scale of 1 (Very Easy) to 5 (Quite Challenging), how difficult does '$habitDesc' feel for you right now?"),
+            Text(
+              "On a scale of 1 (Very Easy) to 5 (Quite Challenging), how difficult does '$habitDesc' feel for you right now?",
+            ),
             const SizedBox(height: 16),
             Slider(
               value: habitDifficulty.toDouble(),
@@ -267,10 +344,7 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 TextButton(onPressed: prevStep, child: const Text('Back')),
-                ElevatedButton(
-                  onPressed: nextStep,
-                  child: const Text('Next'),
-                ),
+                ElevatedButton(onPressed: nextStep, child: const Text('Next')),
               ],
             ),
           ],
@@ -279,22 +353,27 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("To make '$habitDesc' easier to stick to, when and where will you typically do it? (Optional)"),
+            Text(
+              "To make '$habitDesc' easier to stick to, when and where will you typically do it? (Optional)",
+            ),
             const SizedBox(height: 16),
-            ...whenWhereOptions.map((option) => RadioListTile<String>(
-                  title: Text(option),
-                  value: option,
-                  groupValue: selectedWhenWhere,
-                  onChanged: (val) {
-                    setState(() {
-                      selectedWhenWhere = val;
-                      if (val != 'Other...') customWhenWhere = '';
-                    });
-                  },
-                )),
+            ...whenWhereOptions.map(
+              (option) => SelectableOptionTile(
+                label: option,
+                selected: selectedWhenWhere == option,
+                onTap: () {
+                  setState(() {
+                    selectedWhenWhere = option;
+                    if (option != 'Other...') customWhenWhere = '';
+                  });
+                },
+              ),
+            ),
             if (selectedWhenWhere == 'Other...')
               TextField(
-                decoration: const InputDecoration(labelText: 'Custom When/Where'),
+                decoration: const InputDecoration(
+                  labelText: 'Custom When/Where',
+                ),
                 onChanged: (val) => customWhenWhere = val,
               ),
             const Spacer(),
@@ -305,9 +384,10 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
                 ElevatedButton(
                   onPressed: () {
                     setState(() {
-                      habitWhenWhere = selectedWhenWhere == 'Other...'
-                          ? customWhenWhere
-                          : (selectedWhenWhere ?? '');
+                      habitWhenWhere =
+                          selectedWhenWhere == 'Other...'
+                              ? customWhenWhere
+                              : (selectedWhenWhere ?? '');
                       habits.add({
                         'desc': habitDesc,
                         'difficulty': habitDifficulty,
@@ -334,7 +414,9 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Great! Let's add another small habit (we recommend starting with 3-5 total)."),
+            const Text(
+              "Great! Let's add another small habit (we recommend starting with 3-5 total).",
+            ),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -358,18 +440,22 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
             ),
             const SizedBox(height: 24),
             if (habits.isNotEmpty)
-              ...habits.map((h) => ListTile(
-                    leading: const Icon(Icons.check),
-                    title: Text(h['desc'] ?? ''),
-                    subtitle: Text('Difficulty: ${h['difficulty']}'),
-                  )),
+              ...habits.map(
+                (h) => ListTile(
+                  leading: const Icon(Icons.check),
+                  title: Text(h['desc'] ?? ''),
+                  subtitle: Text('Difficulty: ${h['difficulty']}'),
+                ),
+              ),
           ],
         );
       case 7:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Now, let's define some rewards you can 'buy' with the points you earn. These should be things you genuinely enjoy!"),
+            const Text(
+              "Now, let's define some rewards you can 'buy' with the points you earn. These should be things you genuinely enjoy!",
+            ),
             const Spacer(),
             Align(
               alignment: Alignment.bottomRight,
@@ -384,19 +470,22 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("What's a simple reward you'd like to treat yourself to? (e.g., Watch one TV episode, Enjoy a coffee break, 15 mins social media, Listen to a podcast)"),
+            const Text(
+              "What's a simple reward you'd like to treat yourself to? (e.g., Watch one TV episode, Enjoy a coffee break, 15 mins social media, Listen to a podcast)",
+            ),
             const SizedBox(height: 16),
-            ...rewardOptions.map((option) => RadioListTile<String>(
-                  title: Text(option),
-                  value: option,
-                  groupValue: selectedReward,
-                  onChanged: (val) {
-                    setState(() {
-                      selectedReward = val;
-                      if (val != 'Other...') customReward = '';
-                    });
-                  },
-                )),
+            ...rewardOptions.map(
+              (option) => SelectableOptionTile(
+                label: option,
+                selected: selectedReward == option,
+                onTap: () {
+                  setState(() {
+                    selectedReward = option;
+                    if (option != 'Other...') customReward = '';
+                  });
+                },
+              ),
+            ),
             if (selectedReward == 'Other...')
               TextField(
                 decoration: const InputDecoration(labelText: 'Custom Reward'),
@@ -408,14 +497,20 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
               children: [
                 TextButton(onPressed: prevStep, child: const Text('Back')),
                 ElevatedButton(
-                  onPressed: selectedReward != null && (selectedReward != 'Other...' || customReward.isNotEmpty)
-                      ? () {
-                          setState(() {
-                            rewardDesc = selectedReward == 'Other...' ? customReward : selectedReward!;
-                          });
-                          nextStep();
-                        }
-                      : null,
+                  onPressed:
+                      selectedReward != null &&
+                              (selectedReward != 'Other...' ||
+                                  customReward.isNotEmpty)
+                          ? () {
+                            setState(() {
+                              rewardDesc =
+                                  selectedReward == 'Other...'
+                                      ? customReward
+                                      : selectedReward!;
+                            });
+                            nextStep();
+                          }
+                          : null,
                   child: const Text('Next'),
                 ),
               ],
@@ -426,7 +521,9 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("How many 'Habit Points' should this reward cost? (e.g., 2-3 successful habit completions)"),
+            Text(
+              "How many 'Habit Points' should this reward cost? (e.g., 2-3 successful habit completions)",
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: rewardCostController,
@@ -446,10 +543,7 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
                 ElevatedButton(
                   onPressed: () {
                     setState(() {
-                      rewards.add({
-                        'desc': rewardDesc,
-                        'cost': rewardCost,
-                      });
+                      rewards.add({'desc': rewardDesc, 'cost': rewardCost});
                       rewardController.clear();
                       rewardCostController.text = '2';
                       rewardDesc = '';
@@ -484,11 +578,13 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
             ),
             const SizedBox(height: 24),
             if (rewards.isNotEmpty)
-              ...rewards.map((r) => ListTile(
-                    leading: const Icon(Icons.card_giftcard),
-                    title: Text(r['desc'] ?? ''),
-                    subtitle: Text('Cost: ${r['cost']}'),
-                  )),
+              ...rewards.map(
+                (r) => ListTile(
+                  leading: const Icon(Icons.card_giftcard),
+                  title: Text(r['desc'] ?? ''),
+                  subtitle: Text('Cost: ${r['cost']}'),
+                ),
+              ),
           ],
         );
       case 11:
@@ -501,18 +597,22 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
             if (goalDesc.isNotEmpty) Text('Goal: $goalDesc'),
             const SizedBox(height: 16),
             const Text('Habits:'),
-            ...habits.map((h) => ListTile(
-                  leading: const Icon(Icons.check),
-                  title: Text(h['desc'] ?? ''),
-                  subtitle: Text('Difficulty: ${h['difficulty']}'),
-                )),
+            ...habits.map(
+              (h) => ListTile(
+                leading: const Icon(Icons.check),
+                title: Text(h['desc'] ?? ''),
+                subtitle: Text('Difficulty: ${h['difficulty']}'),
+              ),
+            ),
             const SizedBox(height: 16),
             const Text('Rewards:'),
-            ...rewards.map((r) => ListTile(
-                  leading: const Icon(Icons.card_giftcard),
-                  title: Text(r['desc'] ?? ''),
-                  subtitle: Text('Cost: ${r['cost']}'),
-                )),
+            ...rewards.map(
+              (r) => ListTile(
+                leading: const Icon(Icons.card_giftcard),
+                title: Text(r['desc'] ?? ''),
+                subtitle: Text('Cost: ${r['cost']}'),
+              ),
+            ),
             const Spacer(),
             Align(
               alignment: Alignment.bottomRight,
@@ -538,9 +638,82 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
         title: const Text('Know Thyself Wizard'),
         automaticallyImplyLeading: false,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: buildStep(),
+      body: Padding(padding: const EdgeInsets.all(24.0), child: buildStep()),
+    );
+  }
+}
+
+class SelectableOptionTile extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const SelectableOptionTile({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeInOut,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: selected ? Colors.green[100] : Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: selected ? Colors.green : Colors.grey.shade300,
+          width: 2,
+        ),
+        boxShadow:
+            selected
+                ? [
+                  BoxShadow(
+                    color: Colors.green.withOpacity(0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+                : [],
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Row(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeInOut,
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: selected ? Colors.green : Colors.transparent,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: selected ? Colors.green : Colors.grey.shade400,
+                  width: 2,
+                ),
+              ),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child:
+                    selected
+                        ? const Icon(
+                          Icons.check,
+                          color: Colors.white,
+                          size: 20,
+                          key: ValueKey('check'),
+                        )
+                        : const SizedBox.shrink(key: ValueKey('empty')),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(child: Text(label, style: const TextStyle(fontSize: 16))),
+          ],
+        ),
       ),
     );
   }
