@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:convert';
 import 'services/gemini_service.dart';
+import 'services/notification_helper.dart';
 
 class KnowThyselfWizard extends StatefulWidget {
   final VoidCallback onComplete;
@@ -592,6 +593,7 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
               child: ElevatedButton(
                 onPressed: () async {
                   await saveToFirestore();
+                  await NotificationHelper.initialize();
                   // Prepare data for Gemini
                   final geminiPrompt = '''
 
@@ -657,7 +659,8 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
       "name": "string",
       "points": integer,
       "rationale": "string (optional)",
-      "suggested_cue": "string (optional)"
+      "suggested_cue": "string (optional)",
+      "suggested_notification_time": "string (24h, e.g. '07:30', optional)"
     }
     // ... up to 5 habits total
   ],
@@ -670,6 +673,7 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
     // ... 2-3 rewards total
   ]
 }
+```
 ''';
                   final gemini = GeminiService(
                     dotenv.env['GEMINI_API_KEY'] ?? '',
@@ -696,6 +700,7 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
                       if (uid != null) {
                         // Save habits
                         if (geminiJson['habits'] is List) {
+                          int notifId = 1000;
                           for (final habit in geminiJson['habits']) {
                             final habitId =
                                 FirebaseFirestore.instance
@@ -715,6 +720,18 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
                                   if (habit['suggested_cue'] != null)
                                     'whenWhere': habit['suggested_cue'],
                                 });
+                            // Schedule notification if suggested_notification_time exists
+                            if (habit['suggested_notification_time'] != null &&
+                                habit['suggested_notification_time']
+                                    .toString()
+                                    .contains(':')) {
+                              await NotificationHelper.scheduleHabitNotification(
+                                id: notifId++,
+                                title: 'Habit Reminder',
+                                body: habit['name'],
+                                time24h: habit['suggested_notification_time'],
+                              );
+                            }
                           }
                         }
                         // Save rewards
