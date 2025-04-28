@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'dart:convert';
+import 'services/gemini_service.dart';
 
 class KnowThyselfWizard extends StatefulWidget {
   final VoidCallback onComplete;
@@ -20,7 +23,6 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
   String habitWhenWhere = '';
   List<Map<String, dynamic>> rewards = [];
   String rewardDesc = '';
-  int rewardCost = 2;
 
   // Choice options
   final List<String> areaOptions = [
@@ -79,7 +81,6 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
   final habitController = TextEditingController();
   final whenWhereController = TextEditingController();
   final rewardController = TextEditingController();
-  final rewardCostController = TextEditingController(text: '2');
 
   @override
   void dispose() {
@@ -88,7 +89,6 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
     habitController.dispose();
     whenWhereController.dispose();
     rewardController.dispose();
-    rewardCostController.dispose();
     super.dispose();
   }
 
@@ -140,7 +140,6 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
         'id': rewardId,
         'userId': uid,
         'desc': reward['desc'],
-        'cost': reward['cost'],
       });
     }
   }
@@ -521,57 +520,33 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              "How many 'Habit Points' should this reward cost? (e.g., 2-3 successful habit completions)",
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: rewardCostController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Point Cost'),
-              onChanged: (v) {
-                setState(() {
-                  rewardCost = int.tryParse(v) ?? 2;
-                });
-              },
-            ),
-            const Spacer(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TextButton(onPressed: prevStep, child: const Text('Back')),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      rewards.add({'desc': rewardDesc, 'cost': rewardCost});
-                      rewardController.clear();
-                      rewardCostController.text = '2';
-                      rewardDesc = '';
-                      rewardCost = 2;
-                    });
-                    nextStep();
-                  },
-                  child: const Text('Next'),
-                ),
-              ],
-            ),
-          ],
-        );
-      case 10:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
             const Text("Want to add another reward?"),
             const SizedBox(height: 16),
             Row(
               children: [
                 ElevatedButton(
-                  onPressed: () => setState(() => step = 8),
+                  onPressed: () {
+                    // Add current reward if not already added
+                    if (rewardDesc.isNotEmpty &&
+                        (rewards.isEmpty ||
+                            rewards.last['desc'] != rewardDesc)) {
+                      rewards.add({'desc': rewardDesc});
+                    }
+                    setState(() => step = 8);
+                  },
                   child: const Text('Add Another Reward'),
                 ),
                 const SizedBox(width: 16),
                 ElevatedButton(
-                  onPressed: () => setState(() => step = 11),
+                  onPressed: () {
+                    // Add current reward if not already added
+                    if (rewardDesc.isNotEmpty &&
+                        (rewards.isEmpty ||
+                            rewards.last['desc'] != rewardDesc)) {
+                      rewards.add({'desc': rewardDesc});
+                    }
+                    setState(() => step = 11);
+                  },
                   child: const Text('Done for Now'),
                 ),
               ],
@@ -582,7 +557,6 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
                 (r) => ListTile(
                   leading: const Icon(Icons.card_giftcard),
                   title: Text(r['desc'] ?? ''),
-                  subtitle: Text('Cost: ${r['cost']}'),
                 ),
               ),
           ],
@@ -610,7 +584,6 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
               (r) => ListTile(
                 leading: const Icon(Icons.card_giftcard),
                 title: Text(r['desc'] ?? ''),
-                subtitle: Text('Cost: ${r['cost']}'),
               ),
             ),
             const Spacer(),
@@ -619,6 +592,157 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
               child: ElevatedButton(
                 onPressed: () async {
                   await saveToFirestore();
+                  // Prepare data for Gemini
+                  final geminiPrompt = '''
+
+**Role:** You are an expert setup assistant for the LiFE Ledger app, specializing in translating user goals into effective, personalized starting configurations based on behavioral science principles (micro-habits, goal-setting, reinforcement schedules, self-regulation).
+
+**Context:** The user has completed the "Know Thyself" onboarding wizard. Your task is to process their answers to create an initial set of habits and rewards that are motivating, achievable, and balanced. Aim to maximize the user's chances of early success and sustained engagement.
+
+**Core Principles to Apply:**
+* **Goal Decomposition:** Break down the `Success Description` into concrete actions.
+* **Micro-Habits:** Define habits that are specific, small, and require low activation energy.
+* **Starting Small & Early Wins:** Ensure at least one habit is rated as very easy (approx. 5 points).
+* **User-Defined Motivation:** Base rewards primarily on user ideas.
+* **Balanced Reinforcement:** Include both easily attainable (low-cost) and aspirational (higher-cost) rewards.
+* **Cue-Response Links:** Suggest potential triggers/times for habits (Implementation Intentions/Habit Stacking).
+* **Transparency:** Optionally explain the reasoning behind suggestions.
+
+**Input Data from User Onboarding:**
+
+* **Focus Area:** {user_focus_area} *(e.g., "Health", "Productivity", "Learning", "Mindfulness")*
+* **Success Description:** {user_success_description} *(e.g., "Feel more energetic", "Finish my online course", "Be more present daily")*
+* **Initial Habit Idea:** {user_initial_habit_idea} *(e.g., "Go for a walk", "Meditate", "Focus work")*
+* **Perceived Difficulty (1-5):** {user_difficulty_rating} *(e.g., 3)*
+* **Implementation Intention (Optional):** {user_implementation_intention} *(e.g., "After my morning coffee", "When I get home from work")*
+* **Reward Idea(s):** {user_reward_ideas} *(e.g., "Watch one TV episode", "Coffee break", "Read fiction", "Listen to music")*
+* **Desired Reward Frequency/Effort Balance (Implied):** {user_reward_cost_setting_context} *(e.g., User set initial reward cost suggesting they want it accessible every 1-2 days)*
+
+**Task:**
+
+1.  **Analyze Goal & Initial Habit:** Deeply analyze the `Focus Area` and `Success Description` to understand the user's underlying objective. Refine the `Initial Habit Idea` into a specific micro-habit if necessary.
+2.  **Generate Supporting Habits:**
+    * Generate 2-4 *additional* specific, small, daily/near-daily micro-habits that directly support the `Success Description` and `Focus Area`. Aim for a total of 3-5 habits.
+    * **Ensure at least one generated habit is very easy (target 5 points).**
+    * *Tailoring Examples:*
+        * *Health:* Hydration, short walks, stairs, stretching, healthy snack choice.
+        * *Productivity:* Plan day, focus block (Pomodoro), clear workspace, single-tasking for 15 mins.
+        * *Learning:* Read 1 page/article, 5 mins language app, watch short tutorial, practice 1 concept.
+        * *Mindfulness:* 1-minute breathing, mindful moment check-in, short body scan, gratitude note.
+3.  **Assign Habit Points & Rationale:**
+    * Assign point values (integer) based on perceived difficulty (Scale: 1=5, 2=8, 3=10, 4=13, 5=15 pts). Use the `Perceived Difficulty` rating for the initial habit and estimate for others relative to the goal.
+    * For each habit, include an optional `rationale` (string, max 1 sentence) explaining how it contributes to the user's goal (e.g., "Builds consistency", "Provides energy boost").
+    * Include an optional `suggested_cue` (string) suggesting a potential time or trigger (e.g., "Before breakfast", "During commute", "After existing habit X").
+4.  **Generate Rewards & Costs:**
+    * Refine user's `Reward Idea(s)` into specific rewards. Generate 1-2 additional ideas if needed, aiming for 2-3 total.
+    * Assign point costs (integer). **Ensure at least one reward is low-cost** (e.g., earnable with 1-2 successful moderate habits) and **at least one is higher-cost** (requiring several successful habits). Base costs on potential daily earnings and `user_reward_cost_setting_context`.
+    * Include an optional `rationale` (string, max 1 sentence) for reward costs (e.g., "Accessible daily motivator", "Meaningful goal to work towards").
+5.  **Format Output:** Present the results as a single, valid JSON object. Include an `adaptive_setup` flag set to `true`.
+
+**Constraints:**
+
+* Output MUST be a valid JSON object.
+* No explanatory text outside the JSON structure.
+* Habits must be small, actionable micro-habits.
+* Point values and costs must be integers.
+* Optional fields (`rationale`, `suggested_cue`) should only be included if meaningful content can be generated for them.
+
+**Output Format (JSON):**
+
+```json
+{
+  "adaptive_setup": true,
+  "habits": [
+    {
+      "name": "string",
+      "points": integer,
+      "rationale": "string (optional)",
+      "suggested_cue": "string (optional)"
+    }
+    // ... up to 5 habits total
+  ],
+  "rewards": [
+    {
+      "name": "string",
+      "cost": integer,
+      "rationale": "string (optional)"
+    }
+    // ... 2-3 rewards total
+  ]
+}
+''';
+                  final gemini = GeminiService(
+                    dotenv.env['GEMINI_API_KEY'] ?? '',
+                  );
+                  final geminiResult = await gemini.generateText(geminiPrompt);
+                  debugPrint('Gemini result: $geminiResult');
+                  // Parse and save Gemini habits and rewards to Firebase
+                  try {
+                    if (geminiResult != null) {
+                      // Remove Markdown code block markers if present
+                      String cleaned = geminiResult.trim();
+                      if (cleaned.startsWith('```')) {
+                        final firstNewline = cleaned.indexOf('\n');
+                        if (firstNewline != -1) {
+                          cleaned = cleaned.substring(firstNewline + 1);
+                        }
+                        if (cleaned.endsWith('```')) {
+                          cleaned = cleaned.substring(0, cleaned.length - 3);
+                        }
+                        cleaned = cleaned.trim();
+                      }
+                      final geminiJson = jsonDecode(cleaned);
+                      final uid = FirebaseAuth.instance.currentUser?.uid;
+                      if (uid != null) {
+                        // Save habits
+                        if (geminiJson['habits'] is List) {
+                          for (final habit in geminiJson['habits']) {
+                            final habitId =
+                                FirebaseFirestore.instance
+                                    .collection('habits')
+                                    .doc()
+                                    .id;
+                            await FirebaseFirestore.instance
+                                .collection('habits')
+                                .doc(habitId)
+                                .set({
+                                  'id': habitId,
+                                  'userId': uid,
+                                  'desc': habit['name'],
+                                  'difficulty': habit['points'],
+                                  if (habit['rationale'] != null)
+                                    'rationale': habit['rationale'],
+                                  if (habit['suggested_cue'] != null)
+                                    'whenWhere': habit['suggested_cue'],
+                                });
+                          }
+                        }
+                        // Save rewards
+                        if (geminiJson['rewards'] is List) {
+                          for (final reward in geminiJson['rewards']) {
+                            final rewardId =
+                                FirebaseFirestore.instance
+                                    .collection('rewards')
+                                    .doc()
+                                    .id;
+                            await FirebaseFirestore.instance
+                                .collection('rewards')
+                                .doc(rewardId)
+                                .set({
+                                  'id': rewardId,
+                                  'userId': uid,
+                                  'desc': reward['name'],
+                                  'cost': reward['cost'],
+                                  if (reward['rationale'] != null)
+                                    'rationale': reward['rationale'],
+                                });
+                          }
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    debugPrint('Error parsing/saving Gemini result: $e');
+                  }
                   widget.onComplete();
                 },
                 child: const Text('Start Tracking!'),

@@ -2,9 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/app_user.dart';
 import '../models/goal.dart';
 import '../models/habit.dart';
-import '../models/achievement.dart';
-import '../models/challenge.dart';
-import '../models/progress_log.dart';
+import '../models/reward.dart';
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -57,6 +55,12 @@ class FirestoreService {
     await _db.collection('habits').doc(habitId).delete();
   }
 
+  Future<void> setHabitSharedWithFriends(String habitId, bool shared) async {
+    await _db.collection('habits').doc(habitId).update({
+      'sharedWithFriends': shared,
+    });
+  }
+
   Stream<List<Habit>> habitsStream(String userId) => _db
       .collection('habits')
       .where('userId', isEqualTo: userId)
@@ -65,70 +69,135 @@ class FirestoreService {
         (snap) => snap.docs.map((d) => Habit.fromMap(d.data(), d.id)).toList(),
       );
 
-  // Achievements
-  Future<void> addAchievement(Achievement achievement) async {
-    await _db
-        .collection('achievements')
-        .doc(achievement.id)
-        .set(achievement.toMap());
-  }
-
-  Future<void> updateAchievement(Achievement achievement) async {
-    await _db
-        .collection('achievements')
-        .doc(achievement.id)
-        .update(achievement.toMap());
-  }
-
-  Future<void> deleteAchievement(String achievementId) async {
-    await _db.collection('achievements').doc(achievementId).delete();
-  }
-
-  Stream<List<Achievement>> achievementsStream(String userId) => _db
-      .collection('achievements')
+  Stream<List<Habit>> sharedHabitsStream(String userId) => _db
+      .collection('habits')
       .where('userId', isEqualTo: userId)
+      .where('sharedWithFriends', isEqualTo: true)
       .snapshots()
       .map(
-        (snap) =>
-            snap.docs.map((d) => Achievement.fromMap(d.data(), d.id)).toList(),
+        (snap) => snap.docs.map((d) => Habit.fromMap(d.data(), d.id)).toList(),
       );
 
-  // Challenges
-  Future<void> addChallenge(Challenge challenge) async {
-    await _db.collection('challenges').doc(challenge.id).set(challenge.toMap());
+  // Habit Completions
+  Future<void> completeHabit({
+    required String userId,
+    required String habitId,
+    required DateTime date,
+  }) async {
+    final dateStr = _dateToYMD(date);
+    final docId = '${userId}_$habitId",$dateStr';
+    await _db.collection('habit_completions').doc(docId).set({
+      'userId': userId,
+      'habitId': habitId,
+      'date': dateStr,
+    });
   }
 
-  Future<void> updateChallenge(Challenge challenge) async {
+  Stream<List<String>> habitCompletionsStream({
+    required String userId,
+    required String habitId,
+  }) {
+    return _db
+        .collection('habit_completions')
+        .where('userId', isEqualTo: userId)
+        .where('habitId', isEqualTo: habitId)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => d['date'] as String).toList());
+  }
+
+  // Rewards
+  Future<void> addReward(Reward reward) async {
+    await _db.collection('rewards').doc(reward.id).set(reward.toMap());
+  }
+
+  Future<void> updateReward(Reward reward) async {
+    await _db.collection('rewards').doc(reward.id).update(reward.toMap());
+  }
+
+  Future<void> deleteReward(String rewardId) async {
+    await _db.collection('rewards').doc(rewardId).delete();
+  }
+
+  Stream<List<Reward>> rewardsStream(String userId) => _db
+      .collection('rewards')
+      .where('userId', isEqualTo: userId)
+      .snapshots()
+      .map((snap) => snap.docs.map((d) => Reward.fromMap(d.data())).toList());
+
+  Future<void> redeemReward(String rewardId) async {
+    final doc = _db.collection('rewards').doc(rewardId);
+    await _db.runTransaction((transaction) async {
+      final snapshot = await transaction.get(doc);
+      final current = snapshot.data();
+      final currentCount = (current?['redeemedCount'] ?? 0) as int;
+      transaction.update(doc, {'redeemedCount': currentCount + 1});
+    });
+  }
+
+  // FRIENDS & FRIEND REQUESTS
+  Future<void> sendFriendRequest({
+    required String fromUid,
+    required String toEmail,
+  }) async {
+    // Find user by email
+    final userQuery =
+        await _db.collection('users').where('email', isEqualTo: toEmail).get();
+    if (userQuery.docs.isEmpty) throw Exception('User not found');
+    final toUid = userQuery.docs.first.id;
+    // Add a friend request document
+    await _db.collection('friend_requests').add({
+      'fromUid': fromUid,
+      'toUid': toUid,
+      'status': 'pending',
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Stream<List<Map<String, dynamic>>> incomingFriendRequests(String myUid) {
+    return _db
+        .collection('friend_requests')
+        .where('toUid', isEqualTo: myUid)
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .map(
+          (snap) => snap.docs.map((d) => {...d.data(), 'id': d.id}).toList(),
+        );
+  }
+
+  Future<void> acceptFriendRequest(String requestId) async {
+    final reqDoc = _db.collection('friend_requests').doc(requestId);
+    final reqSnap = await reqDoc.get();
+    final data = reqSnap.data()!;
+    final fromUid = data['fromUid'];
+    final toUid = data['toUid'];
+    // Add each other as friends
     await _db
-        .collection('challenges')
-        .doc(challenge.id)
-        .update(challenge.toMap());
+        .collection('users')
+        .doc(fromUid)
+        .collection('friends')
+        .doc(toUid)
+        .set({'since': FieldValue.serverTimestamp()});
+    await _db
+        .collection('users')
+        .doc(toUid)
+        .collection('friends')
+        .doc(fromUid)
+        .set({'since': FieldValue.serverTimestamp()});
+    // Mark request as accepted
+    await reqDoc.update({'status': 'accepted'});
   }
 
-  Future<void> deleteChallenge(String challengeId) async {
-    await _db.collection('challenges').doc(challengeId).delete();
+  Stream<List<Map<String, dynamic>>> friendsStream(String myUid) {
+    return _db
+        .collection('users')
+        .doc(myUid)
+        .collection('friends')
+        .snapshots()
+        .map(
+          (snap) => snap.docs.map((d) => {'uid': d.id, ...d.data()}).toList(),
+        );
   }
 
-  Stream<List<Challenge>> challengesStream(String userId) => _db
-      .collection('challenges')
-      .where('userId', isEqualTo: userId)
-      .snapshots()
-      .map(
-        (snap) =>
-            snap.docs.map((d) => Challenge.fromMap(d.data(), d.id)).toList(),
-      );
-
-  // Progress Logs
-  Future<void> addProgressLog(ProgressLog log) async {
-    await _db.collection('progress_logs').doc(log.id).set(log.toMap());
-  }
-
-  Stream<List<ProgressLog>> progressLogsStream(String userId) => _db
-      .collection('progress_logs')
-      .where('userId', isEqualTo: userId)
-      .snapshots()
-      .map(
-        (snap) =>
-            snap.docs.map((d) => ProgressLog.fromMap(d.data(), d.id)).toList(),
-      );
+  String _dateToYMD(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 }

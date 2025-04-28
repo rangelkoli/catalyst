@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'services/firestore_service.dart';
 import 'models/habit.dart';
+import 'widgets/habit_completion_tile.dart';
+import 'widgets/user_points_widget.dart';
 
 class HabitsScreen extends StatefulWidget {
   const HabitsScreen({super.key});
@@ -141,7 +143,10 @@ class _HabitsScreenState extends State<HabitsScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return const Center(child: Text('Not signed in'));
     return Scaffold(
-      appBar: AppBar(title: const Text('Habits')),
+      appBar: AppBar(
+        title: const Text('Habits'),
+        actions: const [UserPointsWidget()],
+      ),
       body: StreamBuilder<List<Habit>>(
         stream: _firestore.habitsStream(user.uid),
         builder: (context, habitSnap) {
@@ -155,26 +160,17 @@ class _HabitsScreenState extends State<HabitsScreen> {
             itemCount: habits.length,
             itemBuilder: (context, i) {
               final habit = habits[i];
-              return ListTile(
-                title: Text(habit.desc),
-                subtitle: Text(
-                  'When/Where: ${habit.whenWhere}\nDifficulty: ${habit.difficulty}',
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit),
-                      onPressed: () => _showEditHabitDialog(habit),
+              return Row(
+                children: [
+                  Expanded(
+                    child: HabitCompletionTile(
+                      habit: habit,
+                      firestore: _firestore,
+                      userId: user.uid,
+                      onEdit: () => _showEditHabitDialog(habit),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.delete),
-                      onPressed: () async {
-                        await _firestore.deleteHabit(habit.id);
-                      },
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               );
             },
           );

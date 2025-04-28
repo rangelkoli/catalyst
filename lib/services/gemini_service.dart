@@ -8,7 +8,7 @@ class GeminiService {
 
   Future<String?> generateText(String prompt) async {
     final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=$apiKey',
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey',
     );
     final body = jsonEncode({
       "contents": [

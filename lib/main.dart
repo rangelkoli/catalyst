@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'auth_gate.dart';
 import 'dashboard_screen.dart';
 import 'profile_screen.dart';
 import 'goal_screen.dart';
 import 'habits_screen.dart';
-import 'achievements_screen.dart';
-import 'challenges_screen.dart';
-import 'progress_screen.dart';
+import 'reward_screen.dart';
+import 'widgets/user_points_widget.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load();
   await Firebase.initializeApp();
   runApp(const MyApp());
 }
@@ -43,9 +44,7 @@ class _MyHomePageState extends State<MyHomePage> {
     DashboardScreen(),
     GoalScreen(),
     HabitsScreen(),
-    ProgressScreen(),
-    ChallengesScreen(),
-    AchievementsScreen(),
+    RewardScreen(),
     ProfileScreen(),
   ];
 
@@ -58,10 +57,6 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
-      ),
       body: _screens[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         items: const [
@@ -75,16 +70,8 @@ class _MyHomePageState extends State<MyHomePage> {
             label: 'Habits',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.show_chart),
-            label: 'Progress',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.emoji_events),
-            label: 'Challenges',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.star),
-            label: 'Achievements',
+            icon: Icon(Icons.card_giftcard),
+            label: 'Rewards',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],

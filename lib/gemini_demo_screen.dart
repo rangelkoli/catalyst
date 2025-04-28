@@ -14,7 +14,7 @@ class _GeminiDemoScreenState extends State<GeminiDemoScreen> {
   bool _loading = false;
 
   // TODO: Replace with your actual Gemini API key
-  final gemini = GeminiService('YOUR_GEMINI_API_KEY');
+  final gemini = GeminiService('AIzaSyAZ8oHSI3Pec8iAgYV1P3RV3Nv3bf_WD00');
 
   Future<void> _sendPrompt() async {
     setState(() {

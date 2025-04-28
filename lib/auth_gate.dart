@@ -39,8 +39,12 @@ class AuthGate extends StatelessWidget {
             if (!onboardedSnap.data!) {
               return KnowThyselfWizard(
                 onComplete: () {
-                  // After onboarding, rebuild to show main app
-                  (context as Element).reassemble();
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder:
+                          (_) => MyHomePage(title: 'Flutter Demo Home Page'),
+                    ),
+                  );
                 },
               );
             }

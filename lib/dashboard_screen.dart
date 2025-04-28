@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'services/firestore_service.dart';
 import 'models/goal.dart';
 import 'models/habit.dart';
+import 'widgets/user_points_widget.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -13,7 +14,10 @@ class DashboardScreen extends StatelessWidget {
     if (user == null) return const Center(child: Text('Not signed in'));
     final firestore = FirestoreService();
     return Scaffold(
-      appBar: AppBar(title: const Text('Dashboard')),
+      appBar: AppBar(
+        title: const Text('Dashboard'),
+        actions: const [UserPointsWidget()],
+      ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
