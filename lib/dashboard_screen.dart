@@ -1,3 +1,4 @@
+import 'package:catalyst/services/notification_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'services/firestore_service.dart';
@@ -21,11 +22,23 @@ class DashboardScreen extends StatelessWidget {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text(
-              'Your Goals',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Your Goals',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    // Trigger test notification
+                    await NotificationHelper.sendTestNotification();
+                  },
+                  child: const Text('Test Notification'),
+                ),
+              ],
             ),
           ),
           Expanded(

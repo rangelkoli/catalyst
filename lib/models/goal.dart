@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Goal {
   final String id;
   final String userId;
@@ -24,16 +26,20 @@ class Goal {
   factory Goal.fromMap(Map<String, dynamic> data, String id) => Goal(
     id: id,
     userId: data['userId'] ?? '',
-    title: data['title'] ?? '', // Fix: use 'title' from db
-    description: data['description'] ?? '', // Fix: use 'description' from db
+    title: data['title'] ?? '',
+    description: data['description'] ?? '',
     habitIds: List<String>.from(data['habitIds'] ?? []),
     progress: data['progress'] ?? 0,
     tags: List<String>.from(data['tags'] ?? []),
     streak: data['streak'] ?? 0,
     targetDate:
-        data['targetDate'] != null
-            ? DateTime.tryParse(data['targetDate'])
-            : null,
+        data['targetDate'] == null
+            ? null
+            : (data['targetDate'] is DateTime)
+            ? data['targetDate']
+            : (data['targetDate'] is Timestamp)
+            ? (data['targetDate'] as Timestamp).toDate()
+            : DateTime.tryParse(data['targetDate'].toString()),
   );
 
   Map<String, dynamic> toMap() => {

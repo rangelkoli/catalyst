@@ -59,4 +59,27 @@ class NotificationHelper {
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
     );
   }
+
+  static Future<void> sendTestNotification() async {
+    await initialize();
+    final now = DateTime.now();
+    final scheduled = now.add(const Duration(minutes: 2));
+    await _notificationsPlugin.zonedSchedule(
+      9999, // Arbitrary test ID
+      'Test Notification',
+      'This is a test notification sent 2 minutes from now.',
+      tz.TZDateTime.from(scheduled, tz.local),
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'test_channel',
+          'Test Notifications',
+          importance: Importance.max,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+      matchDateTimeComponents: null,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    );
+  }
 }
