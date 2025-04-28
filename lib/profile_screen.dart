@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'widgets/user_points_widget.dart';
 import 'friends_screen.dart';
+import 'history_page.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -32,8 +33,11 @@ class ProfileScreen extends StatelessWidget {
                 child: const Text('Sign Out'),
               ),
               const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () {
+              ListTile(
+                leading: const Icon(Icons.group),
+                title: const Text('Friends'),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -41,7 +45,20 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   );
                 },
-                child: const Text('Friends'),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.history),
+                title: const Text('History'),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const HistoryPage(),
+                    ),
+                  );
+                },
               ),
             ],
           ],

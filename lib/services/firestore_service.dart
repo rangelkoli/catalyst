@@ -105,6 +105,46 @@ class FirestoreService {
         .map((snap) => snap.docs.map((d) => d['date'] as String).toList());
   }
 
+  /// Adjusts habit points based on recent consistency (Effort Decay & Struggle Boost)
+  Future<void> autoAdjustHabitPoints(String userId) async {
+    final habitsSnap =
+        await _db.collection('habits').where('userId', isEqualTo: userId).get();
+    final now = DateTime.now();
+    final start = now.subtract(const Duration(days: 28)); // last 4 weeks
+    for (final doc in habitsSnap.docs) {
+      final habit = Habit.fromMap(doc.data(), doc.id);
+      // Get completions for last 28 days
+      final completionsSnap =
+          await _db
+              .collection('habit_completions')
+              .where('userId', isEqualTo: userId)
+              .where('habitId', isEqualTo: habit.id)
+              .where('date', isGreaterThanOrEqualTo: _dateToYMD(start))
+              .get();
+      final completions =
+          completionsSnap.docs.map((d) => d['date'] as String).toSet();
+      int totalDays = now.difference(start).inDays + 1;
+      int completedDays = 0;
+      for (int i = 0; i < totalDays; i++) {
+        final day = start.add(Duration(days: i));
+        final ymd = _dateToYMD(day);
+        if (completions.contains(ymd)) completedDays++;
+      }
+      final rate = completedDays / totalDays;
+      int newDifficulty = habit.difficulty;
+      if (rate > 0.85 && habit.difficulty > 1) {
+        newDifficulty = habit.difficulty - 1; // Effort Decay
+      } else if (rate < 0.4) {
+        newDifficulty = habit.difficulty + 1; // Struggle Boost
+      }
+      if (newDifficulty != habit.difficulty) {
+        await _db.collection('habits').doc(habit.id).update({
+          'difficulty': newDifficulty,
+        });
+      }
+    }
+  }
+
   // Rewards
   Future<void> addReward(Reward reward) async {
     await _db.collection('rewards').doc(reward.id).set(reward.toMap());

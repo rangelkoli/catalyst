@@ -74,36 +74,45 @@ class _HabitCompletionTileState extends State<HabitCompletionTile> {
                       tooltip: 'Edit Habit',
                       onPressed: widget.onEdit,
                     ),
-                  IconButton(
-                    icon: Icon(
+                  if (widget.onEdit != null)
+                    IconButton(
+                      icon: Icon(
+                        widget.habit.sharedWithFriends
+                            ? Icons.share
+                            : Icons.share_outlined,
+                        color:
+                            widget.habit.sharedWithFriends ? Colors.blue : null,
+                      ),
+                      tooltip:
+                          widget.habit.sharedWithFriends
+                              ? 'Unshare with Friends'
+                              : 'Share with Friends',
+                      onPressed: () async {
+                        final newValue = !widget.habit.sharedWithFriends;
+                        await widget.firestore.setHabitSharedWithFriends(
+                          widget.habit.id,
+                          newValue,
+                        );
+                        setState(() {});
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              newValue
+                                  ? 'Habit shared with friends!'
+                                  : 'Habit unshared.',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  if (widget.onEdit == null)
+                    Icon(
                       widget.habit.sharedWithFriends
                           ? Icons.share
                           : Icons.share_outlined,
                       color:
                           widget.habit.sharedWithFriends ? Colors.blue : null,
                     ),
-                    tooltip:
-                        widget.habit.sharedWithFriends
-                            ? 'Unshare with Friends'
-                            : 'Share with Friends',
-                    onPressed: () async {
-                      final newValue = !widget.habit.sharedWithFriends;
-                      await widget.firestore.setHabitSharedWithFriends(
-                        widget.habit.id,
-                        newValue,
-                      );
-                      setState(() {});
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            newValue
-                                ? 'Habit shared with friends!'
-                                : 'Habit unshared.',
-                          ),
-                        ),
-                      );
-                    },
-                  ),
                   Icon(expanded ? Icons.expand_less : Icons.expand_more),
                 ],
               ),
