@@ -100,7 +100,46 @@ class _RewardScreenState extends State<RewardScreen> {
   }
 
   void _redeemReward(Reward reward) async {
-    await _firestore.redeemReward(reward.id);
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    // Calculate available points (earned - spent)
+    final habits = await _firestore.habitsStream(user.uid).first;
+    final completionsFutures = habits.map(
+      (habit) =>
+          _firestore
+              .habitCompletionsStream(userId: user.uid, habitId: habit.id)
+              .first,
+    );
+    final completionsList = await Future.wait(completionsFutures);
+    int totalPoints = 0;
+    for (int i = 0; i < habits.length; i++) {
+      final habit = habits[i];
+      final completions = completionsList[i];
+      totalPoints +=
+          (completions.length * (habit.difficulty > 0 ? habit.difficulty : 1))
+              .toInt();
+    }
+    final rewards = await _firestore.rewardsStream(user.uid).first;
+    final spent = rewards.fold<int>(
+      0,
+      (sum, r) =>
+          sum +
+          ((r.cost > 0 ? r.cost : 0) *
+              (r.redeemedCount > 0 ? r.redeemedCount : 0)),
+    );
+    final availablePoints = totalPoints - spent;
+    if (availablePoints >= reward.cost) {
+      await _firestore.redeemReward(reward.id);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You do not have enough points. Do more habits!'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override

@@ -31,6 +31,7 @@ class _GoalScreenState extends State<GoalScreen> {
   ];
   DateTime? _selectedTargetDate;
   int _expandedIndex = -1;
+  List<String> _selectedHabitIds = [];
 
   @override
   void dispose() {
@@ -46,62 +47,102 @@ class _GoalScreenState extends State<GoalScreen> {
       userId: user.uid,
       title: _titleController.text.trim(),
       description: _descController.text.trim(),
+      habitIds: List<String>.from(_selectedHabitIds),
       targetDate: _selectedTargetDate,
     );
     await _firestore.addGoal(goal);
     _titleController.clear();
     _descController.clear();
     _selectedTargetDate = null;
+    _selectedHabitIds = [];
     Navigator.of(context).pop();
   }
 
   void _showAddGoalDialog() {
     _selectedTargetDate = null;
+    _selectedHabitIds = [];
+    final user = FirebaseAuth.instance.currentUser;
     showDialog(
       context: context,
       builder:
           (context) => AlertDialog(
             title: const Text('Add Goal'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: _titleController,
-                  decoration: const InputDecoration(labelText: 'Title'),
-                ),
-                TextField(
-                  controller: _descController,
-                  decoration: const InputDecoration(labelText: 'Description'),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _selectedTargetDate == null
-                            ? 'No target date'
-                            : 'Target: ${_selectedTargetDate!.toLocal().toString().split(' ')[0]}',
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: _titleController,
+                    decoration: const InputDecoration(labelText: 'Title'),
+                  ),
+                  TextField(
+                    controller: _descController,
+                    decoration: const InputDecoration(labelText: 'Description'),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _selectedTargetDate == null
+                              ? 'No target date'
+                              : 'Target: ${_selectedTargetDate!.toLocal().toString().split(' ')[0]}',
+                        ),
                       ),
-                    ),
-                    TextButton(
-                      onPressed: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: DateTime.now(),
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2100),
-                        );
-                        if (picked != null) {
-                          setState(() {
-                            _selectedTargetDate = picked;
-                          });
-                        }
-                      },
-                      child: const Text('Pick Date'),
-                    ),
-                  ],
-                ),
-              ],
+                      TextButton(
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime.now(),
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null) {
+                            setState(() {
+                              _selectedTargetDate = picked;
+                            });
+                          }
+                        },
+                        child: const Text('Pick Date'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  StreamBuilder<List<Habit>>(
+                    stream: _firestore.habitsStream(user!.uid),
+                    builder: (context, snap) {
+                      if (!snap.hasData) return const LinearProgressIndicator();
+                      final habits = snap.data!;
+                      if (habits.isEmpty)
+                        return const Text('No habits to link.');
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Link Habits:',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          ...habits.map(
+                            (habit) => CheckboxListTile(
+                              value: _selectedHabitIds.contains(habit.id),
+                              title: Text(habit.desc),
+                              onChanged: (checked) {
+                                setState(() {
+                                  if (checked == true) {
+                                    _selectedHabitIds.add(habit.id);
+                                  } else {
+                                    _selectedHabitIds.remove(habit.id);
+                                  }
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
             actions: [
               TextButton(
@@ -118,51 +159,89 @@ class _GoalScreenState extends State<GoalScreen> {
     _titleController.text = goal.title;
     _descController.text = goal.description;
     _selectedTargetDate = goal.targetDate;
+    _selectedHabitIds = List<String>.from(goal.habitIds);
+    final user = FirebaseAuth.instance.currentUser;
     showDialog(
       context: context,
       builder:
           (context) => AlertDialog(
             title: const Text('Edit Goal'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: _titleController,
-                  decoration: const InputDecoration(labelText: 'Title'),
-                ),
-                TextField(
-                  controller: _descController,
-                  decoration: const InputDecoration(labelText: 'Description'),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _selectedTargetDate == null
-                            ? 'No target date'
-                            : 'Target: ${_selectedTargetDate!.toLocal().toString().split(' ')[0]}',
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: _titleController,
+                    decoration: const InputDecoration(labelText: 'Title'),
+                  ),
+                  TextField(
+                    controller: _descController,
+                    decoration: const InputDecoration(labelText: 'Description'),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _selectedTargetDate == null
+                              ? 'No target date'
+                              : 'Target: ${_selectedTargetDate!.toLocal().toString().split(' ')[0]}',
+                        ),
                       ),
-                    ),
-                    TextButton(
-                      onPressed: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _selectedTargetDate ?? DateTime.now(),
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2100),
-                        );
-                        if (picked != null) {
-                          setState(() {
-                            _selectedTargetDate = picked;
-                          });
-                        }
-                      },
-                      child: const Text('Pick Date'),
-                    ),
-                  ],
-                ),
-              ],
+                      TextButton(
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _selectedTargetDate ?? DateTime.now(),
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null) {
+                            setState(() {
+                              _selectedTargetDate = picked;
+                            });
+                          }
+                        },
+                        child: const Text('Pick Date'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  StreamBuilder<List<Habit>>(
+                    stream: _firestore.habitsStream(user!.uid),
+                    builder: (context, snap) {
+                      if (!snap.hasData) return const LinearProgressIndicator();
+                      final habits = snap.data!;
+                      if (habits.isEmpty)
+                        return const Text('No habits to link.');
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Link Habits:',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          ...habits.map(
+                            (habit) => CheckboxListTile(
+                              value: _selectedHabitIds.contains(habit.id),
+                              title: Text(habit.desc),
+                              onChanged: (checked) {
+                                setState(() {
+                                  if (checked == true) {
+                                    _selectedHabitIds.add(habit.id);
+                                  } else {
+                                    _selectedHabitIds.remove(habit.id);
+                                  }
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
             actions: [
               TextButton(
@@ -176,7 +255,7 @@ class _GoalScreenState extends State<GoalScreen> {
                     userId: goal.userId,
                     title: _titleController.text.trim(),
                     description: _descController.text.trim(),
-                    habitIds: goal.habitIds,
+                    habitIds: List<String>.from(_selectedHabitIds),
                     progress: goal.progress,
                     tags: goal.tags,
                     streak: goal.streak,
@@ -186,6 +265,7 @@ class _GoalScreenState extends State<GoalScreen> {
                   _titleController.clear();
                   _descController.clear();
                   _selectedTargetDate = null;
+                  _selectedHabitIds = [];
                   Navigator.of(context).pop();
                 },
                 child: const Text('Save'),

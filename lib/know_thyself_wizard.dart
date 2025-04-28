@@ -34,46 +34,172 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
     'Finances',
     'Other...',
   ];
+
+  final Map<String, List<String>> areaGoalOptions = {
+    'Health': [
+      'Feel more energetic',
+      'Improve sleep quality',
+      'Exercise regularly',
+      'Eat healthier',
+      'Other...',
+    ],
+    'Productivity': [
+      'Finish my online course',
+      'Be more organized',
+      'Reduce procrastination',
+      'Complete daily tasks',
+      'Other...',
+    ],
+    'Learning': [
+      'Read more books',
+      'Learn a new skill',
+      'Practice daily',
+      'Finish a project',
+      'Other...',
+    ],
+    'Mindfulness': [
+      'Feel calmer daily',
+      'Reduce stress',
+      'Be more present',
+      'Practice gratitude',
+      'Other...',
+    ],
+    'Finances': [
+      'Save more money',
+      'Track expenses',
+      'Reduce spending',
+      'Increase savings',
+      'Other...',
+    ],
+    'Other...': ['Other...'],
+  };
+
+  final Map<String, List<String>> areaHabitOptions = {
+    'Health': [
+      '5-minute walk',
+      'Drink one glass of water',
+      'Stretch for 2 minutes',
+      'Eat a fruit',
+      'Other...',
+    ],
+    'Productivity': [
+      'Plan tomorrow\'s top task',
+      'Focus for 15 minutes',
+      'Clear workspace',
+      'Check off 1 task',
+      'Other...',
+    ],
+    'Learning': [
+      'Read one article',
+      'Practice for 10 minutes',
+      'Watch a tutorial',
+      'Review notes',
+      'Other...',
+    ],
+    'Mindfulness': [
+      '1-minute breathing',
+      'Gratitude note',
+      'Short meditation',
+      'Mindful check-in',
+      'Other...',
+    ],
+    'Finances': [
+      'Log expenses',
+      'Skip a small purchase',
+      'Review budget',
+      'Transfer to savings',
+      'Other...',
+    ],
+    'Other...': ['Other...'],
+  };
+
+  final Map<String, List<String>> areaWhenWhereOptions = {
+    'Health': [
+      'When my first alarm rings',
+      'After lunch',
+      'Before bed',
+      'Other...',
+    ],
+    'Productivity': [
+      'Start of workday',
+      'After lunch',
+      'Before ending work',
+      'Other...',
+    ],
+    'Learning': ['After breakfast', 'Before bed', 'During commute', 'Other...'],
+    'Mindfulness': ['After waking up', 'Before bed', 'After lunch', 'Other...'],
+    'Finances': ['End of day', 'After a purchase', 'Weekly review', 'Other...'],
+    'Other...': ['Other...'],
+  };
+
+  final Map<String, List<String>> areaRewardOptions = {
+    'Health': [
+      'Watch one TV episode',
+      'Enjoy a healthy treat',
+      'Take a relaxing bath',
+      'Other...',
+    ],
+    'Productivity': [
+      '15 mins social media',
+      'Enjoy a coffee break',
+      'Watch a YouTube video',
+      'Other...',
+    ],
+    'Learning': [
+      'Listen to a podcast',
+      'Read fiction',
+      'Watch a favorite show',
+      'Other...',
+    ],
+    'Mindfulness': [
+      'Listen to music',
+      'Take a nature walk',
+      'Enjoy a treat',
+      'Other...',
+    ],
+    'Finances': [
+      'Buy a small treat',
+      'Enjoy a coffee',
+      'Watch a movie',
+      'Other...',
+    ],
+    'Other...': ['Other...'],
+  };
+
+  // Fallback options for each step if area is not found
+  final List<String> goalOptions = [
+    'Make progress',
+    'Feel accomplished',
+    'Build a new habit',
+    'Other...',
+  ];
+  final List<String> habitOptions = [
+    'Do a small task',
+    'Reflect for 1 minute',
+    'Track my progress',
+    'Other...',
+  ];
+  final List<String> whenWhereOptions = [
+    'After waking up',
+    'Before bed',
+    'After lunch',
+    'Other...',
+  ];
+  final List<String> rewardOptions = [
+    'Take a short break',
+    'Enjoy a treat',
+    'Listen to music',
+    'Other...',
+  ];
+
   String? selectedArea;
   String customArea = '';
-
-  final List<String> goalOptions = [
-    'Feel more energetic',
-    'Finish my online course',
-    'Feel calmer daily',
-    'Save more money',
-    'Other...',
-  ];
   String? selectedGoal;
   String customGoal = '';
-
-  final List<String> habitOptions = [
-    '5-minute walk',
-    'Drink one glass of water',
-    'Stretch for 2 minutes',
-    'Plan tomorrow\'s top task',
-    'Read one article',
-    'Other...',
-  ];
   String? selectedHabit;
   String customHabit = '';
-
-  final List<String> whenWhereOptions = [
-    'When my first alarm rings',
-    'After lunch',
-    'Before bed',
-    'Other...',
-  ];
   String? selectedWhenWhere;
   String customWhenWhere = '';
-
-  final List<String> rewardOptions = [
-    'Watch one TV episode',
-    'Enjoy a coffee break',
-    '15 mins social media',
-    'Listen to a podcast',
-    'Other...',
-  ];
   String? selectedReward;
   String customReward = '';
 
@@ -170,6 +296,7 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
           ],
         );
       case 1:
+        final areaList = areaOptions;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -177,7 +304,7 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
               "What's one area of your life you'd like to focus on improving right now? (e.g., Health, Productivity, Learning, Mindfulness, Finances)",
             ),
             const SizedBox(height: 16),
-            ...areaOptions.map(
+            ...(areaList ?? []).map(
               (option) => SelectableOptionTile(
                 label: option,
                 selected: selectedArea == option,
@@ -185,6 +312,15 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
                   setState(() {
                     selectedArea = option;
                     if (option != 'Other...') customArea = '';
+                    // Reset dependent selections
+                    selectedGoal = null;
+                    customGoal = '';
+                    selectedHabit = null;
+                    customHabit = '';
+                    selectedWhenWhere = null;
+                    customWhenWhere = '';
+                    selectedReward = null;
+                    customReward = '';
                   });
                 },
               ),
@@ -222,6 +358,10 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
           ],
         );
       case 2:
+        final goalList =
+            selectedArea != null && areaGoalOptions.containsKey(selectedArea!)
+                ? areaGoalOptions[selectedArea!]
+                : goalOptions;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -229,7 +369,7 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
               "Can you briefly describe what 'success' in $area looks like for you in the next month or two? (Optional)",
             ),
             const SizedBox(height: 16),
-            ...goalOptions.map(
+            ...(goalList ?? []).map(
               (option) => SelectableOptionTile(
                 label: option,
                 selected: selectedGoal == option,
@@ -273,14 +413,20 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
           ],
         );
       case 3:
+        final habitList =
+            selectedArea != null && areaHabitOptions.containsKey(selectedArea!)
+                ? areaHabitOptions[selectedArea!]
+                : habitOptions;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "Thinking about your goal of ${goalDesc.isNotEmpty ? goalDesc : area}, what's a small, simple action you could take almost every day to move towards it?",
+              "Thinking about your goal of " +
+                  (goalDesc.isNotEmpty ? goalDesc : area) +
+                  ", what's a small, simple action you could take almost every day to move towards it?",
             ),
             const SizedBox(height: 16),
-            ...habitOptions.map(
+            ...(habitList ?? []).map(
               (option) => SelectableOptionTile(
                 label: option,
                 selected: selectedHabit == option,
@@ -350,6 +496,11 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
           ],
         );
       case 5:
+        final whenWhereList =
+            selectedArea != null &&
+                    areaWhenWhereOptions.containsKey(selectedArea!)
+                ? areaWhenWhereOptions[selectedArea!]
+                : whenWhereOptions;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -357,7 +508,7 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
               "To make '$habitDesc' easier to stick to, when and where will you typically do it? (Optional)",
             ),
             const SizedBox(height: 16),
-            ...whenWhereOptions.map(
+            ...(whenWhereList ?? []).map(
               (option) => SelectableOptionTile(
                 label: option,
                 selected: selectedWhenWhere == option,
@@ -467,6 +618,10 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
           ],
         );
       case 8:
+        final rewardList =
+            selectedArea != null && areaRewardOptions.containsKey(selectedArea!)
+                ? areaRewardOptions[selectedArea!]
+                : rewardOptions;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -474,7 +629,7 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
               "What's a simple reward you'd like to treat yourself to? (e.g., Watch one TV episode, Enjoy a coffee break, 15 mins social media, Listen to a podcast)",
             ),
             const SizedBox(height: 16),
-            ...rewardOptions.map(
+            ...(rewardList ?? []).map(
               (option) => SelectableOptionTile(
                 label: option,
                 selected: selectedReward == option,
@@ -612,13 +767,15 @@ class _KnowThyselfWizardState extends State<KnowThyselfWizard> {
 
 **Input Data from User Onboarding:**
 
-* **Focus Area:** {user_focus_area} *(e.g., "Health", "Productivity", "Learning", "Mindfulness")*
-* **Success Description:** {user_success_description} *(e.g., "Feel more energetic", "Finish my online course", "Be more present daily")*
-* **Initial Habit Idea:** {user_initial_habit_idea} *(e.g., "Go for a walk", "Meditate", "Focus work")*
-* **Perceived Difficulty (1-5):** {user_difficulty_rating} *(e.g., 3)*
-* **Implementation Intention (Optional):** {user_implementation_intention} *(e.g., "After my morning coffee", "When I get home from work")*
-* **Reward Idea(s):** {user_reward_ideas} *(e.g., "Watch one TV episode", "Coffee break", "Read fiction", "Listen to music")*
-* **Desired Reward Frequency/Effort Balance (Implied):** {user_reward_cost_setting_context} *(e.g., User set initial reward cost suggesting they want it accessible every 1-2 days)*
+* **Focus Area:** $area *(e.g., "Health", "Productivity", "Learning", "Mindfulness")*
+* **Success Description:** $goalDesc *(e.g., "Feel more energetic", "Finish my online course", "Be more present daily")*
+* **User-Selected Habits:** ${habits.map((h) => h['desc']).toList()} *(e.g., ["Go for a walk", "Meditate", "Focus work"])*
+* **User-Selected Rewards:** ${rewards.map((r) => r['desc']).toList()} *(e.g., ["Watch one TV episode", "Coffee break"])*
+* **Initial Habit Idea:** ${habits.isNotEmpty ? habits.first['desc'] : ''} *(e.g., "Go for a walk", "Meditate", "Focus work")*
+* **Perceived Difficulty (1-5):** ${habits.isNotEmpty ? habits.first['difficulty'] : habitDifficulty} *(e.g., 3)*
+* **Implementation Intention (Optional):** ${habits.isNotEmpty ? habits.first['whenWhere'] : ''} *(e.g., "After my morning coffee", "When I get home from work")*
+* **Reward Idea(s):** ${rewards.map((r) => r['desc']).toList()} *(e.g., "Watch one TV episode", "Coffee break", "Read fiction", "Listen to music")*
+* **Desired Reward Frequency/Effort Balance (Implied):** User set initial reward cost suggesting they want it accessible every 1-2 days
 
 **Task:**
 

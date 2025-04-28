@@ -85,12 +85,22 @@ class FirestoreService {
     required DateTime date,
   }) async {
     final dateStr = _dateToYMD(date);
-    final docId = '${userId}_$habitId",$dateStr';
+    final docId = '${userId}_$habitId,$dateStr';
     await _db.collection('habit_completions').doc(docId).set({
       'userId': userId,
       'habitId': habitId,
       'date': dateStr,
     });
+  }
+
+  Future<void> uncompleteHabit({
+    required String userId,
+    required String habitId,
+    required DateTime date,
+  }) async {
+    final dateStr = _dateToYMD(date);
+    final docId = '${userId}_$habitId,$dateStr';
+    await _db.collection('habit_completions').doc(docId).delete();
   }
 
   Stream<List<String>> habitCompletionsStream({

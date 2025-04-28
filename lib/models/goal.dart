@@ -24,8 +24,8 @@ class Goal {
   factory Goal.fromMap(Map<String, dynamic> data, String id) => Goal(
     id: id,
     userId: data['userId'] ?? '',
-    title: data['area'] ?? '',
-    description: data['goalDesc'] ?? '',
+    title: data['title'] ?? '', // Fix: use 'title' from db
+    description: data['description'] ?? '', // Fix: use 'description' from db
     habitIds: List<String>.from(data['habitIds'] ?? []),
     progress: data['progress'] ?? 0,
     tags: List<String>.from(data['tags'] ?? []),
